@@ -1,0 +1,13 @@
+pandas
+numpy
+scikit-learn
+matplotlib
+networkx
+rdkit
+torch
+torch-geometric
+transformers
+tqdm
+jupyter
+ipykernel
+iterative-stratification

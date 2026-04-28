@@ -1,0 +1,22 @@
+Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+This license statement applies to the OdorNet dataset files under
+`data/processed/` and to source-rich data restored from the Zenodo archive.
+
+You are free to share and adapt the dataset for any purpose, including
+commercial use, provided that appropriate credit is given, a link to the
+license is provided, and changes are indicated when applicable.
+
+License URL:
+https://creativecommons.org/licenses/by/4.0/
+
+Recommended attribution:
+SEA-Driven OdorNet: A Large-Scale Standardized Molecular Olfactory Dataset
+Based on a Hybrid Semantic Taxonomy. Version 1.0.0.
+DOI: 10.5281/zenodo.19838456.
+
+Original source responsibility:
+OdorNet integrates and standardizes labels from public literature and open
+database sources. Users are responsible for citing original sources when their
+downstream work relies on source-specific records, historical labels, raw
+labels, or source-specific interpretations.

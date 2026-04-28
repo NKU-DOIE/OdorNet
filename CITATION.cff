@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use OdorNet, please cite the dataset paper or repository record."
+title: "SEA-Driven OdorNet: A Large-Scale Standardized Molecular Olfactory Dataset Based on a Hybrid Semantic Taxonomy"
+authors:
+  - name: "Liyuan Yang"
+  - name: "Zhiyang Liu"
+  - name: "Bin Shao"
+  - name: "Feng Liu"
+  - name: "Zhuo Ma"
+  - name: "Chunning Zhao"
+  - name: "Xiang wan"
+  - name: "Weichao Wang"
+
+version: "1.0.0"
+date-released: "2026-04-28"
+license: "MIT AND CC-BY-4.0"
+repository-code: "https://github.com/NKU-DOIE/OdorNet"
+doi: "10.5281/zenodo.19838456"
+# Journal, publisher, and final publication year: To be confirmed.

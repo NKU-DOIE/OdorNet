@@ -1,0 +1,24 @@
+OdorNet License Summary
+
+Maintained by the Lab of Digital Olfaction and Intelligent Equipment,
+College of Electronic Information and Optical Engineering, Nankai University
+(NKU-DOIE)
+
+This repository uses separate licenses for code/documentation and dataset
+files.
+
+Code, examples, notebooks, and documentation:
+MIT License. See `LICENSE-MIT`.
+
+Dataset files:
+Creative Commons Attribution 4.0 International (CC BY 4.0). See
+`LICENSE-CC-BY-4.0`.
+
+Unless a file states otherwise, data files under `data/processed/` are licensed
+under CC BY 4.0. Source-rich data restored from the Zenodo archive is also
+licensed under CC BY 4.0. Source code, examples, notebooks, and repository
+documentation are licensed under MIT.
+
+Users should cite OdorNet when using the dataset and should also cite original
+data sources when downstream work depends on source-specific records,
+historical labels, or raw-source interpretations.

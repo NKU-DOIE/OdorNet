@@ -1,0 +1,57 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments and local configuration
+.env
+.env.*
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs, temporary files, and OS/editor files
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Local Codex handoff and scratch files
+.codex
+codex_read.md
+codex_log/
+provenance.py
+
+# Local-only Zenodo/source reconstruction data.
+# The public GitHub release keeps only data/processed/* for ML training.
+data/README.md
+data/raw/*
+data/metadata/*
+data/provenance/*
+!data/raw/.gitkeep
+!data/metadata/.gitkeep
+!data/provenance/.gitkeep
+
+# Private or non-public source data
+raw_private/
+private/
+
+# Large generated artifacts, checkpoints, and experiment trackers
+saved_pom_models/
+outputs/
+data_releases/
+checkpoints/
+models/
+molformer_config/
+wandb/
+mlruns/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
