@@ -143,16 +143,17 @@ The SEA processing notebook and split-strategy notebook require source-level dat
 - `notebooks/odornet_sea_pipeline.ipynb`: source loading, descriptor co-occurrence statistics, expert-corrected SEA mapping, Double-Drop label generation, source merge, and release-label verification.
 - `notebooks/odornet_split_strategy.ipynb`: historical split-design notes retained for reference.
 
-To reproduce these notebooks from a clean clone, restore the Zenodo archive over the repository data directory:
+To reproduce these notebooks from a clean clone, download and extract the
+current Zenodo archive over the repository data directory:
 
 ```bash
 git clone https://github.com/NKU-DOIE/OdorNet.git
 cd OdorNet
-python scripts/download_zenodo_release.py --extract --output-dir zenodo_release
-cp -a zenodo_release/<release-directory>/data/. data/
+# Download OdorNet_v1.1.0.zip from the current Zenodo record, then extract it.
+cp -a <extracted-release-directory>/data/. data/
 ```
 
-After this overlay, `data/raw/`, `data/metadata/`, `data/provenance/`, and the source-rich Zenodo version of `data/processed/full_dataset.csv` are available locally, and the technical-validation notebook can be executed.
+After this overlay, `data/raw/`, `data/metadata/`, `data/provenance/`, and the source-rich Zenodo version of `data/processed/full_dataset.csv` are available locally, and the technical-validation notebook can be executed. The Zenodo archive is maintained and uploaded separately from this GitHub repository.
 
 ## Reviewer Validation
 
@@ -196,8 +197,7 @@ The archive includes processed tables, row-wise provenance files, metadata, raw 
 ├── examples/
 │   └── demo_load_odornet.py
 ├── scripts/
-│   ├── download_zenodo_release.py
-│   └── build_zenodo_release.py
+│   └── run_reviewer_evaluations.py
 ├── notebooks/
 │   ├── odornet_baseline_training.ipynb
 │   └── technical_validation.ipynb
