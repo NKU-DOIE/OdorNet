@@ -1,0 +1,4 @@
+split,rows,nan_cells,nan_rows
+train,6224,15805,5284
+val,1778,0,0
+test,890,0,0

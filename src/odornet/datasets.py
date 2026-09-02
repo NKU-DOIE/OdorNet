@@ -14,7 +14,7 @@ LABEL_COLUMNS = [
     "sweety&gourmand",
     "floral",
     "fruity&vegetable",
-    "pungent&disagreetable",
+    "pungent&disagreeable",
     "green&herbal",
     "nutty",
     "woody&mossy",
@@ -29,6 +29,7 @@ DEFAULT_PROCESSED_DIR = Path("data") / "processed"
 DEFAULT_RAW_SOURCE_PATH = Path("data") / "raw" / "merged_8892_cleaned_251230.pkl"
 DEFAULT_FULL_PATH = DEFAULT_PROCESSED_DIR / "full_dataset.csv"
 DEFAULT_TRAIN_PATH = DEFAULT_PROCESSED_DIR / "dataset_train_aligned.csv"
+DEFAULT_VAL_PATH = DEFAULT_PROCESSED_DIR / "dataset_val_aligned.csv"
 DEFAULT_TEST_PATH = DEFAULT_PROCESSED_DIR / "dataset_test_aligned.csv"
 
 
@@ -85,13 +86,15 @@ def load_odornet(split: str = "full", root: Path | str | None = None) -> pd.Data
     Parameters
     ----------
     split:
-        One of `full`, `train`, or `test`.
+        One of `full`, `train`, `val`/`validation`, or `test`.
     root:
         Repository root. If omitted, it is inferred from the current directory.
     """
     split_to_path = {
         "full": DEFAULT_FULL_PATH,
         "train": DEFAULT_TRAIN_PATH,
+        "val": DEFAULT_VAL_PATH,
+        "validation": DEFAULT_VAL_PATH,
         "test": DEFAULT_TEST_PATH,
     }
     if split not in split_to_path:

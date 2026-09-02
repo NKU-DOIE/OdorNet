@@ -1,0 +1,19 @@
+{
+  "input_molecule_rows": 8892,
+  "input_source_records": 23247,
+  "raw_nonempty_smiles_unique": 8892,
+  "empty_smiles_records": 0,
+  "rdkit_parse_failures": 0,
+  "rdkit_sanitize_failures": 0,
+  "rdkit_canonicalization_failures": 0,
+  "invalid_or_unusable_records_removed": 0,
+  "valid_source_records": 23247,
+  "unique_cleaned_isomeric_smiles": 8892,
+  "duplicate_source_records_removed": 14355,
+  "top_level_molecule_smiles": 8892,
+  "top_level_smiles_parse_or_clean_failures": 0,
+  "cleaned_set_matches_top_level_set": true,
+  "top_level_only_smiles_count": 0,
+  "cleaned_only_smiles_count": 0,
+  "cleaned_set_matches_released_full_isomeric_set": true
+}

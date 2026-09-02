@@ -1,0 +1,56 @@
+{
+  "experiment": "sea_integration_modes",
+  "source_split_directory": "data/processed",
+  "split_files": {
+    "train": {
+      "path": "data/processed/dataset_train_aligned.csv",
+      "sha256": "8c511453ab79e2a2fd4345db7a07144e47189819a90d7606d12762f5d7e3eeba",
+      "rows": 6224
+    },
+    "val": {
+      "path": "data/processed/dataset_val_aligned.csv",
+      "sha256": "16725b980726b0121508f9eb88ee088c30bed93157a36bec899fef4b50fd6fa5",
+      "rows": 1778
+    },
+    "test": {
+      "path": "data/processed/dataset_test_aligned.csv",
+      "sha256": "3ac723dc6cb92c88904cd395918d0da843b44c370a6c0852d85fcc9b8918f34a",
+      "rows": 890
+    }
+  },
+  "integration_modes": [
+    "drop",
+    "union",
+    "intersection"
+  ],
+  "models": [
+    "gnn",
+    "molformer"
+  ],
+  "training_seed": 959,
+  "threshold": 0.5,
+  "optimize_validation_thresholds": false,
+  "batch_size": 48,
+  "num_epochs": 30,
+  "gnn_num_layers": 2,
+  "nan_policy_semantics": {
+    "drop": "ignore unresolved label cells in the loss",
+    "union": "treat unresolved label cells as positive",
+    "intersection": "treat unresolved label cells as negative"
+  },
+  "determinism": {
+    "python_random_numpy_torch_seed": 959,
+    "cudnn_deterministic": true,
+    "cudnn_benchmark": false,
+    "torch_deterministic_algorithms": true,
+    "data_loader_workers": 0
+  },
+  "software": {
+    "python": "3.11.9",
+    "pandas": "2.2.3",
+    "torch": "2.5.1+cu124",
+    "cuda_available": true,
+    "cuda_version": "12.4",
+    "platform": "Windows-10-10.0.26200-SP0"
+  }
+}

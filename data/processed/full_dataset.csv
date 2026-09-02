@@ -1,4 +1,4 @@
-SMILES,animalic&ambery,sweety&gourmand,floral,fruity&vegetable,pungent&disagreetable,green&herbal,nutty,woody&mossy,resinous&balsamic,cooked,odorless,spice
+SMILES,animalic&ambery,sweety&gourmand,floral,fruity&vegetable,pungent&disagreeable,green&herbal,nutty,woody&mossy,resinous&balsamic,cooked,odorless,spice
 CCCCCCOC(=O)CCC(C)C,0.0,1.0,0.0,,0.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0
 CC1=CC(=O)[C@@H](C(C)C)CC1,0.0,0.0,0.0,0.0,,1.0,0.0,0.0,0.0,0.0,0.0,
 CCCC(=O)CCCC(=O)O,,0.0,0.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0

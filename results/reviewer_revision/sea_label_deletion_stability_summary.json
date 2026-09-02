@@ -1,0 +1,10 @@
+{
+  "repetitions": 10,
+  "drop_fraction": 0.2,
+  "mean_label_cell_agreement": 0.9569444444444445,
+  "std_label_cell_agreement": 0.0005158855392675475,
+  "mean_molecule_exact_agreement": 0.6149347728295097,
+  "std_molecule_exact_agreement": 0.004352031371197737,
+  "mean_positive_jaccard": 0.7399439780382765,
+  "std_positive_jaccard": 0.0039060316091159876
+}

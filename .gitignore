@@ -38,6 +38,10 @@ data/provenance/*
 !data/metadata/.gitkeep
 !data/provenance/.gitkeep
 
+# Small public supporting resources are intentionally tracked.
+!data/resources/
+!data/resources/**
+
 # Private or non-public source data
 raw_private/
 private/
@@ -55,3 +59,31 @@ mlruns/
 *.pth
 *.ckpt
 *.safetensors
+
+# Keep the repository focused on reproducibility summaries, not generated
+# datasets, checkpoints, logs, or intermediate reviewer artifacts.
+results/reviewer_revision/*
+!results/reviewer_revision/.gitkeep
+!results/reviewer_revision/README.md
+!results/reviewer_revision/smiles_preprocessing_summary.json
+!results/reviewer_revision/smiles_preprocessing_by_source.csv
+!results/reviewer_revision/label_coverage_summary.csv
+!results/reviewer_revision/sea_label_deletion_stability_summary.json
+!results/reviewer_revision/semantic_consistency_summary.json
+!results/reviewer_revision/semantic_consistency_matrix.png
+!results/reviewer_revision/raw_multi_dataset_comparison/
+results/reviewer_revision/raw_multi_dataset_comparison/*
+!results/reviewer_revision/raw_multi_dataset_comparison/training_metrics.csv
+!results/reviewer_revision/raw_multi_dataset_comparison/manifest.json
+!results/reviewer_revision/raw_multi_dataset_comparison/external_split_audit.csv
+!results/reviewer_revision/raw_multi_dataset_comparison/external_split_overview.csv
+!results/reviewer_revision/sea_integration_modes/
+results/reviewer_revision/sea_integration_modes/*
+!results/reviewer_revision/sea_integration_modes/sea_integration_modes_metrics.csv
+!results/reviewer_revision/sea_integration_modes/reproducibility_manifest.json
+!results/reviewer_revision/sea_integration_modes/split_connectivity_audit.csv
+!results/reviewer_revision/sea_integration_modes/split_nan_summary.csv
+!results/reviewer_revision/figures/
+results/reviewer_revision/figures/*
+!results/reviewer_revision/figures/raw_multi_dataset_test_macro_f1.png
+!results/reviewer_revision/figures/sea_integration_mode_test_macro_f1.png

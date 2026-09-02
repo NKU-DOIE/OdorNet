@@ -18,9 +18,10 @@ import pandas as pd
 from .datasets import LABEL_COLUMNS
 
 
-DEFAULT_MAPPING_PATH = Path("data") / "metadata" / "olfactory_classification_strong_weak.json"
-DEFAULT_SPECIALIST_MAPPING_PATH = Path("data") / "metadata" / "final_specialist_label_mapping.json"
-DEFAULT_SEMANTIC_DESCRIPTION_PATH = Path("data") / "metadata" / "olfactory_data_translated.json"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_MAPPING_PATH = REPO_ROOT / "data" / "metadata" / "olfactory_classification_strong_weak.json"
+DEFAULT_SPECIALIST_MAPPING_PATH = REPO_ROOT / "data" / "metadata" / "final_specialist_label_mapping.json"
+DEFAULT_SEMANTIC_DESCRIPTION_PATH = REPO_ROOT / "data" / "metadata" / "olfactory_data_translated.json"
 
 
 def load_main_label_mapping(

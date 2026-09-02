@@ -11,8 +11,10 @@ using repository-relative data inputs.
 from __future__ import annotations
 
 import json
+import os
 import random
 from dataclasses import asdict, dataclass
+from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -38,15 +40,30 @@ class TrainingConfig:
     threshold: float = 0.5
     seed: int = 959
     output_dir: str = "outputs/baseline"
+    molformer_max_length: int = 256
+    molformer_padding: str = "max_length"
+    molformer_attn_implementation: str | None = "eager"
+    l1_lambda: float = 1e-8
+    mixed_precision: bool = False
+    optimize_validation_thresholds: bool = False
+    gnn_num_layers: int = 2
+    verbose: bool = True
 
 
 def set_seed(seed: int = 959) -> None:
+    # Keep all stochastic sources fixed for repeatable CPU/GPU runs.
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    try:
+        torch.use_deterministic_algorithms(True, warn_only=True)
+    except TypeError:
+        torch.use_deterministic_algorithms(True)
 
 
 def target_columns(df: pd.DataFrame) -> list[str]:
@@ -100,11 +117,25 @@ class WeightedMaskedBCELoss(nn.Module):
         return (loss * mask.float()).sum() / valid_count
 
 
+def _normalize_thresholds(
+    threshold: float | list[float] | np.ndarray,
+    n_labels: int,
+) -> np.ndarray:
+    arr = np.asarray(threshold, dtype=float).reshape(-1)
+    if arr.size == 1:
+        return np.full(n_labels, float(arr.item()), dtype=float)
+    if arr.size != n_labels:
+        raise ValueError(
+            f"threshold must be a scalar or have {n_labels} values, got {arr.size}"
+        )
+    return arr
+
+
 def compute_metrics(
     y_true: np.ndarray,
     y_prob: np.ndarray,
     nan_policy: str,
-    threshold: float = 0.5,
+    threshold: float | list[float] | np.ndarray = 0.5,
     labels: list[str] | None = None,
 ) -> dict[str, object]:
     if y_true.ndim == 1:
@@ -115,6 +146,8 @@ def compute_metrics(
     f1_values = []
     auroc_values = []
     labels = labels or [str(i) for i in range(y_true.shape[1])]
+    label_thresholds = _normalize_thresholds(threshold, y_true.shape[1])
+    pred_matrix = (y_prob >= label_thresholds.reshape(1, -1)).astype(int)
 
     for idx, label in enumerate(labels):
         truth = y_true[:, idx]
@@ -135,7 +168,7 @@ def compute_metrics(
         else:
             truth_v = truth[mask].astype(int)
             prob_v = prob[mask]
-            pred_v = (prob_v >= threshold).astype(int)
+            pred_v = pred_matrix[:, idx][mask].astype(int)
             f1 = float(f1_score(truth_v, pred_v, zero_division=0))
             auroc = float(roc_auc_score(truth_v, prob_v)) if len(np.unique(truth_v)) > 1 else 0.5
             support = int(mask.sum())
@@ -156,14 +189,16 @@ def compute_metrics(
         global_mask = ~np.isnan(y_true)
         global_truth = y_true[global_mask].astype(int)
         global_prob = y_prob[global_mask]
+        global_pred = pred_matrix[global_mask]
     elif nan_policy == "union":
         global_truth = np.nan_to_num(y_true, nan=1.0).astype(int).ravel()
         global_prob = y_prob.ravel()
+        global_pred = pred_matrix.ravel()
     else:
         global_truth = np.nan_to_num(y_true, nan=0.0).astype(int).ravel()
         global_prob = y_prob.ravel()
+        global_pred = pred_matrix.ravel()
 
-    global_pred = (global_prob >= threshold).astype(int)
     return {
         "macro_f1": float(np.mean(f1_values)),
         "micro_f1": float(f1_score(global_truth, global_pred, zero_division=0)),
@@ -171,6 +206,85 @@ def compute_metrics(
         "micro_auroc": float(roc_auc_score(global_truth, global_prob))
         if len(np.unique(global_truth)) > 1
         else 0.5,
+        "per_label": per_label,
+    }
+
+
+def compute_optimized_macro_f1(
+    y_true: np.ndarray,
+    y_prob: np.ndarray,
+    nan_policy: str,
+    labels: list[str] | None = None,
+    threshold_grid: np.ndarray | None = None,
+) -> dict[str, object]:
+    """Optimize one decision threshold per label and return their Macro F1.
+
+    This helper reproduces the validation reporting convention used in the
+    archived POM baseline notebook. Thresholds are selected and scored on the
+    same supplied split, so the result is a technical-validation diagnostic
+    rather than an independently calibrated generalization estimate.
+    """
+    if y_true.ndim == 1:
+        y_true = y_true.reshape(-1, 1)
+        y_prob = y_prob.reshape(-1, 1)
+
+    labels = labels or [str(i) for i in range(y_true.shape[1])]
+    threshold_grid = (
+        np.asarray(threshold_grid, dtype=float)
+        if threshold_grid is not None
+        else np.arange(0.01, 1.0, 0.01, dtype=float)
+    )
+    per_label = []
+    f1_values = []
+
+    for idx, label in enumerate(labels):
+        truth = y_true[:, idx]
+        prob = y_prob[:, idx]
+        mask = ~np.isnan(truth)
+        if nan_policy == "union":
+            truth = np.nan_to_num(truth, nan=1.0)
+            mask = np.ones_like(truth, dtype=bool)
+        elif nan_policy == "intersection":
+            truth = np.nan_to_num(truth, nan=0.0)
+            mask = np.ones_like(truth, dtype=bool)
+
+        if mask.sum() == 0:
+            best_f1 = 0.0
+            best_threshold = 0.5
+            support = 0
+            positives = 0
+        else:
+            truth_v = truth[mask].astype(int)
+            prob_v = prob[mask]
+            scores = np.asarray(
+                [
+                    f1_score(
+                        truth_v,
+                        (prob_v >= threshold).astype(int),
+                        zero_division=0,
+                    )
+                    for threshold in threshold_grid
+                ],
+                dtype=float,
+            )
+            best_index = int(scores.argmax())
+            best_f1 = float(scores[best_index])
+            best_threshold = float(threshold_grid[best_index])
+            support = int(mask.sum())
+            positives = int(truth_v.sum())
+        f1_values.append(best_f1)
+        per_label.append(
+            {
+                "label": label,
+                "support": support,
+                "positives": positives,
+                "f1": best_f1,
+                "threshold": best_threshold,
+            }
+        )
+
+    return {
+        "macro_f1": float(np.mean(f1_values)),
         "per_label": per_label,
     }
 
@@ -185,37 +299,64 @@ def _epoch_summary(prefix: str, loss: float, metrics: dict[str, object]) -> dict
     }
 
 
+def _test_thresholds_from_best_per_label(
+    config: TrainingConfig,
+    best_per_label: list[dict[str, object]] | None,
+) -> float | list[float]:
+    if config.optimize_validation_thresholds and best_per_label:
+        thresholds = [
+            float(item.get("threshold", config.threshold))
+            for item in best_per_label
+        ]
+        if len(thresholds) == 1:
+            return thresholds[0]
+        return thresholds
+    return config.threshold
+
+
 class SmilesDataset(Dataset):
     def __init__(
         self,
         df: pd.DataFrame,
-        tokenizer,
         labels: list[str],
         smiles_col: str = "SMILES",
-        max_length: int = 256,
     ):
         self.smiles = df[smiles_col].tolist()
         self.targets = torch.tensor(
             df[labels].apply(pd.to_numeric, errors="coerce").values,
             dtype=torch.float32,
         )
-        self.tokenizer = tokenizer
-        self.max_length = max_length
 
     def __len__(self) -> int:
         return len(self.smiles)
 
-    def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
-        encoded = self.tokenizer(
-            self.smiles[idx],
-            truncation=True,
-            padding="max_length",
-            max_length=self.max_length,
-            return_tensors="pt",
-        )
-        item = {key: value.squeeze(0) for key, value in encoded.items()}
-        item["labels"] = self.targets[idx]
-        return item
+    def __getitem__(self, idx: int) -> dict[str, object]:
+        return {"smiles": self.smiles[idx], "labels": self.targets[idx]}
+
+
+def collate_smiles_batch(
+    batch: list[dict[str, object]],
+    tokenizer,
+    max_length: int,
+    padding: str = "max_length",
+) -> dict[str, torch.Tensor]:
+    encoded = tokenizer(
+        [item["smiles"] for item in batch],
+        truncation=True,
+        padding=padding,
+        max_length=max_length,
+        return_tensors="pt",
+    )
+    encoded["labels"] = torch.stack([item["labels"] for item in batch])
+    return encoded
+
+
+def _autocast_context(device: torch.device, enabled: bool):
+    return torch.autocast(
+        device_type=device.type,
+        dtype=torch.bfloat16,
+        enabled=enabled,
+    )
 
 
 class MolFormerMLP(nn.Module):
@@ -269,6 +410,7 @@ def resolve_molformer_source(
 def load_molformer(
     model_name: str = DEFAULT_MOLFORMER_MODEL,
     local_model_path: str | Path | None = None,
+    attn_implementation: str | None = "eager",
 ):
     """Load MolFormer from a local folder when provided, otherwise from Hugging Face."""
     from transformers import AutoModel, AutoTokenizer
@@ -282,25 +424,30 @@ def load_molformer(
         "local_files_only": local_files_only,
     }
     tokenizer = AutoTokenizer.from_pretrained(source, **load_kwargs)
+    model_kwargs = {**load_kwargs, "deterministic_eval": False}
+    if attn_implementation is not None:
+        model_kwargs["attn_implementation"] = attn_implementation
     try:
-        base = AutoModel.from_pretrained(
-            source,
-            deterministic_eval=False,
-            **load_kwargs,
-        )
+        base = AutoModel.from_pretrained(source, **model_kwargs)
     except TypeError:
-        base = AutoModel.from_pretrained(source, **load_kwargs)
+        model_kwargs.pop("attn_implementation", None)
+        try:
+            base = AutoModel.from_pretrained(source, **model_kwargs)
+        except TypeError:
+            model_kwargs.pop("deterministic_eval", None)
+            base = AutoModel.from_pretrained(source, **model_kwargs)
     return tokenizer, base
 
 
 def train_molformer_baseline(
     train_df: pd.DataFrame,
-    test_df: pd.DataFrame,
+    val_df: pd.DataFrame,
     config: TrainingConfig | None = None,
     model_name: str = DEFAULT_MOLFORMER_MODEL,
     local_model_path: str | Path | None = None,
     labels: list[str] | None = None,
     device: str | torch.device | None = None,
+    test_df: pd.DataFrame | None = None,
 ) -> dict[str, object]:
     config = config or TrainingConfig()
     labels = labels or target_columns(train_df)
@@ -314,17 +461,26 @@ def train_molformer_baseline(
     tokenizer, base = load_molformer(
         model_name=model_name,
         local_model_path=local_model_path,
+        attn_implementation=config.molformer_attn_implementation,
     )
     model = MolFormerMLP(base, num_labels=len(labels)).to(device)
+    collate_fn = partial(
+        collate_smiles_batch,
+        tokenizer=tokenizer,
+        max_length=config.molformer_max_length,
+        padding=config.molformer_padding,
+    )
     train_loader = DataLoader(
-        SmilesDataset(train_df, tokenizer, labels),
+        SmilesDataset(train_df, labels),
         batch_size=config.batch_size,
         shuffle=True,
+        collate_fn=collate_fn,
     )
     val_loader = DataLoader(
-        SmilesDataset(test_df, tokenizer, labels),
+        SmilesDataset(val_df, labels),
         batch_size=config.batch_size,
         shuffle=False,
+        collate_fn=collate_fn,
     )
 
     pos_weight = calculate_pos_weights(train_df, labels).to(device)
@@ -342,27 +498,82 @@ def train_molformer_baseline(
         model_name="molformer",
     )
     result["model_source"] = model_source
+    if test_df is not None:
+        model.load_state_dict(
+            torch.load(Path(result["output_dir"]) / "best_val_macrof1.pt", map_location=device)
+        )
+        if hasattr(model, "molformer_base"):
+            model.molformer_base.config.deterministic_eval = True
+        test_loader = DataLoader(
+            SmilesDataset(test_df, labels),
+            batch_size=config.batch_size,
+            shuffle=False,
+            collate_fn=collate_fn,
+        )
+        test_loss, test_targets, test_probs = _collect_probs_and_loss(
+            model,
+            test_loader,
+            criterion,
+            device,
+            is_graph=False,
+            mixed_precision=False,
+        )
+        test_threshold = _test_thresholds_from_best_per_label(
+            config,
+            result.get("best_per_label"),
+        )
+        test_metrics = compute_metrics(
+            test_targets,
+            test_probs,
+            config.nan_policy,
+            test_threshold,
+            labels,
+        )
+        test_payload = {
+            "loss": float(test_loss),
+            **_epoch_summary("test", test_loss, test_metrics),
+        }
+        result["test_metrics"] = test_payload
+        result["test_per_label"] = test_metrics["per_label"]
+        log_path = Path(result["output_dir"]) / "training_logs.json"
+        try:
+            payload = json.loads(log_path.read_text(encoding="utf-8"))
+            payload["test_metrics"] = test_payload
+            log_path.write_text(
+                json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
     return result
 
 
-def _collect_probs_and_loss(model, loader, criterion, device, is_graph: bool = False):
+def _collect_probs_and_loss(
+    model,
+    loader,
+    criterion,
+    device,
+    is_graph: bool = False,
+    mixed_precision: bool = False,
+):
     total_loss = 0.0
     probs = []
     targets = []
     model.eval()
     with torch.no_grad():
         for batch in loader:
-            if is_graph:
-                batch = batch.to(device)
-                logits = model(batch)
-                y = batch.y
-            else:
-                y = batch.pop("labels").to(device)
-                batch = {key: value.to(device) for key, value in batch.items()}
-                _, logits = model(**batch)
-            loss = criterion(logits, y)
+            with _autocast_context(device, mixed_precision):
+                if is_graph:
+                    batch = batch.to(device)
+                    logits = model(batch)
+                    y = batch.y
+                else:
+                    y = batch.pop("labels").to(device)
+                    batch = {key: value.to(device) for key, value in batch.items()}
+                    _, logits = model(**batch)
+                loss = criterion(logits, y)
             total_loss += loss.item()
-            probs.append(torch.sigmoid(logits).cpu().numpy())
+            probs.append(torch.sigmoid(logits).float().cpu().numpy())
             targets.append(y.detach().cpu().numpy())
     return total_loss / max(len(loader), 1), np.vstack(targets), np.vstack(probs)
 
@@ -384,29 +595,47 @@ def _train_torch_model(
 
     logs = []
     best_macro_f1 = -1.0
+    best_epoch = -1
     best_per_label = None
+    mixed_precision = bool(
+        config.mixed_precision and device.type == "cuda" and not is_graph
+    )
+    scaler = torch.amp.GradScaler("cuda", enabled=False)
 
     for epoch in tqdm(range(config.num_epochs), desc=f"Training {model_name}"):
         model.train()
+        if hasattr(model, "molformer_base"):
+            model.molformer_base.config.deterministic_eval = False
         train_loss = 0.0
         train_probs = []
         train_targets = []
         for batch in train_loader:
             optimizer.zero_grad()
-            if is_graph:
-                batch = batch.to(device)
-                logits = model(batch)
-                y = batch.y
-            else:
-                y = batch.pop("labels").to(device)
-                batch = {key: value.to(device) for key, value in batch.items()}
-                _, logits = model(**batch)
-
-            loss = criterion(logits, y)
-            loss.backward()
-            optimizer.step()
-            train_loss += loss.item()
-            train_probs.append(torch.sigmoid(logits).detach().cpu().numpy())
+            with _autocast_context(device, mixed_precision):
+                if is_graph:
+                    batch = batch.to(device)
+                    logits = model(batch)
+                    y = batch.y
+                else:
+                    y = batch.pop("labels").to(device)
+                    batch = {key: value.to(device) for key, value in batch.items()}
+                    _, logits = model(**batch)
+                data_loss = criterion(logits, y)
+                if config.l1_lambda and hasattr(model, "mlp") and hasattr(model, "final_layer"):
+                    l1_norm = sum(
+                        parameter.abs().sum()
+                        for module in (model.mlp, model.final_layer)
+                        for parameter in module.parameters()
+                    )
+                    loss = data_loss + config.l1_lambda * l1_norm
+                else:
+                    data_loss = criterion(logits, y)
+                    loss = data_loss
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+            train_loss += data_loss.item()
+            train_probs.append(torch.sigmoid(logits).float().detach().cpu().numpy())
             train_targets.append(y.detach().cpu().numpy())
 
         train_loss = train_loss / max(len(train_loader), 1)
@@ -417,8 +646,15 @@ def _train_torch_model(
             config.threshold,
             labels,
         )
+        if hasattr(model, "molformer_base"):
+            model.molformer_base.config.deterministic_eval = True
         val_loss, val_targets, val_probs = _collect_probs_and_loss(
-            model, val_loader, criterion, device, is_graph=is_graph
+            model,
+            val_loader,
+            criterion,
+            device,
+            is_graph=is_graph,
+            mixed_precision=mixed_precision,
         )
         val_metrics = compute_metrics(
             val_targets,
@@ -428,34 +664,74 @@ def _train_torch_model(
             labels,
         )
 
+        selection_metrics = val_metrics
+        if config.optimize_validation_thresholds:
+            selection_metrics = compute_optimized_macro_f1(
+                val_targets,
+                val_probs,
+                config.nan_policy,
+                labels,
+            )
+
         row = {
             "epoch": epoch + 1,
             **_epoch_summary("train", train_loss, train_metrics),
             **_epoch_summary("val", val_loss, val_metrics),
         }
+        if config.optimize_validation_thresholds:
+            row["val_optimized_macro_f1"] = float(selection_metrics["macro_f1"])
         logs.append(row)
-        print(json.dumps(row, indent=2))
+        if config.verbose:
+            print(json.dumps(row, indent=2))
 
-        if val_metrics["macro_f1"] > best_macro_f1:
-            best_macro_f1 = float(val_metrics["macro_f1"])
-            best_per_label = val_metrics["per_label"]
+        if selection_metrics["macro_f1"] > best_macro_f1:
+            best_macro_f1 = float(selection_metrics["macro_f1"])
+            best_epoch = epoch + 1
+            best_per_label = selection_metrics["per_label"]
             torch.save(model.state_dict(), output_dir / "best_val_macrof1.pt")
 
     with (output_dir / "training_logs.json").open("w", encoding="utf-8") as handle:
-        json.dump({"config": asdict(config), "logs": logs, "best_per_label": best_per_label}, handle, indent=2)
+        json.dump(
+            {
+                "config": asdict(config),
+                "logs": logs,
+                "best_per_label": best_per_label,
+                "best_epoch": best_epoch,
+                "best_macro_f1": best_macro_f1,
+                "selection_metric": (
+                    "validation_optimized_macro_f1"
+                    if config.optimize_validation_thresholds
+                    else "validation_macro_f1_at_fixed_threshold"
+                ),
+            },
+            handle,
+            indent=2,
+        )
 
     if best_per_label is not None:
         pd.DataFrame(best_per_label).to_csv(output_dir / "best_per_label_metrics.csv", index=False)
 
-    return {"logs": logs, "best_macro_f1": best_macro_f1, "best_per_label": best_per_label, "output_dir": str(output_dir)}
+    return {
+        "logs": logs,
+        "best_macro_f1": best_macro_f1,
+        "best_epoch": best_epoch,
+        "best_per_label": best_per_label,
+        "selection_metric": (
+            "validation_optimized_macro_f1"
+            if config.optimize_validation_thresholds
+            else "validation_macro_f1_at_fixed_threshold"
+        ),
+        "output_dir": str(output_dir),
+    }
 
 
 def train_gnn_baseline(
     train_df: pd.DataFrame,
-    test_df: pd.DataFrame,
+    val_df: pd.DataFrame,
     config: TrainingConfig | None = None,
     labels: list[str] | None = None,
     device: str | torch.device | None = None,
+    test_df: pd.DataFrame | None = None,
 ) -> dict[str, object]:
     from rdkit import Chem, RDLogger
     from torch_geometric.data import Data
@@ -530,10 +806,14 @@ def train_gnn_baseline(
             return self.graphs[idx]
 
     class SimpleGNN(nn.Module):
-        def __init__(self, input_dim, hidden_dim, num_labels, dropout=0.2):
+        def __init__(self, input_dim, hidden_dim, num_labels, dropout=0.2, num_layers=2):
             super().__init__()
-            self.conv1 = GCNConv(input_dim, hidden_dim)
-            self.conv2 = GCNConv(hidden_dim, hidden_dim)
+            if num_layers < 2:
+                raise ValueError("GNN must use at least 2 graph convolution layers")
+            self.convs = nn.ModuleList(
+                [GCNConv(input_dim, hidden_dim)]
+                + [GCNConv(hidden_dim, hidden_dim) for _ in range(num_layers - 1)]
+            )
             self.dropout = nn.Dropout(dropout)
             self.classifier = nn.Sequential(
                 nn.Linear(hidden_dim, hidden_dim // 2),
@@ -543,9 +823,11 @@ def train_gnn_baseline(
             )
 
         def forward(self, data):
-            x = F.relu(self.conv1(data.x, data.edge_index))
-            x = self.dropout(x)
-            x = F.relu(self.conv2(x, data.edge_index))
+            x = data.x
+            for idx, conv in enumerate(self.convs):
+                x = F.relu(conv(x, data.edge_index))
+                if idx < len(self.convs) - 1:
+                    x = self.dropout(x)
             x = global_mean_pool(x, data.batch)
             return self.classifier(x)
 
@@ -553,18 +835,19 @@ def train_gnn_baseline(
         MoleculeGraphDataset(train_df), batch_size=config.batch_size, shuffle=True
     )
     val_loader = PyGDataLoader(
-        MoleculeGraphDataset(test_df), batch_size=config.batch_size, shuffle=False
+        MoleculeGraphDataset(val_df), batch_size=config.batch_size, shuffle=False
     )
     model = SimpleGNN(
         input_dim=len(allowed_atoms),
         hidden_dim=256,
         num_labels=len(labels),
         dropout=0.2,
+        num_layers=config.gnn_num_layers,
     ).to(device)
     pos_weight = calculate_pos_weights(train_df, labels).to(device)
     criterion = WeightedMaskedBCELoss(config.nan_policy, pos_weight=pos_weight)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-5)
-    return _train_torch_model(
+    result = _train_torch_model(
         model,
         train_loader,
         val_loader,
@@ -576,3 +859,46 @@ def train_gnn_baseline(
         model_name="gnn",
         is_graph=True,
     )
+    if test_df is not None:
+        model.load_state_dict(
+            torch.load(Path(result["output_dir"]) / "best_val_macrof1.pt", map_location=device)
+        )
+        test_loader = PyGDataLoader(
+            MoleculeGraphDataset(test_df), batch_size=config.batch_size, shuffle=False
+        )
+        test_loss, test_targets, test_probs = _collect_probs_and_loss(
+            model,
+            test_loader,
+            criterion,
+            device,
+            is_graph=True,
+            mixed_precision=False,
+        )
+        test_threshold = _test_thresholds_from_best_per_label(
+            config,
+            result.get("best_per_label"),
+        )
+        test_metrics = compute_metrics(
+            test_targets,
+            test_probs,
+            config.nan_policy,
+            test_threshold,
+            labels,
+        )
+        test_payload = {
+            "loss": float(test_loss),
+            **_epoch_summary("test", test_loss, test_metrics),
+        }
+        result["test_metrics"] = test_payload
+        result["test_per_label"] = test_metrics["per_label"]
+        log_path = Path(result["output_dir"]) / "training_logs.json"
+        try:
+            payload = json.loads(log_path.read_text(encoding="utf-8"))
+            payload["test_metrics"] = test_payload
+            log_path.write_text(
+                json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
+    return result

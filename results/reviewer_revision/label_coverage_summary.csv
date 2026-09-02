@@ -1,0 +1,11 @@
+coverage_scope,coverage_status,descriptor_count,molecule_level_occurrences,source_record_label_occurrences,molecule_level_molecule_count_sum,source_record_molecule_count_sum
+molecule_level,total_source_descriptors,556,41755,92137,41755,41764
+source_record,total_source_descriptors,568,41755,92351,41755,41899
+molecule_level,assigned_multiple_primaries,266,8455,19211,8455,8473
+molecule_level,assigned_one_primary,224,30417,66792,30417,30409
+molecule_level,unmapped,39,289,547,289,289
+molecule_level,discarded_not_any_type,27,2594,5587,2594,2593
+source_record,assigned_multiple_primaries,266,8455,19211,8455,8473
+source_record,assigned_one_primary,224,30417,66792,30417,30409
+source_record,unmapped,51,289,761,289,424
+source_record,discarded_not_any_type,27,2594,5587,2594,2593

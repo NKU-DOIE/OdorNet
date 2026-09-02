@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.1.0 release preparation
+
+- Added public Fragrantica reference-vocabulary resources with 1,702 displayed
+  term-category records and 1,698 globally deduplicated terms.
+- Replaced the legacy two-way train/test release with the published
+  connectivity-safe 7:2:1 train/validation/test split (6,224/1,778/890 rows).
+  Validation and test contain no unresolved label cells.
+- Added `split_manifest.json` and a unified `technical_validation.ipynb` with
+  source preprocessing, SEA, label-space, split, comparison, and visualization
+  stages.
+- Added a canonical nine-source registry, source catalog, provenance fields,
+  and a Zenodo package builder with explicit Drop, Union, and Intersection
+  full-dataset tables.
+- Corrected the prior misspelling in the public label interface and
+  standardized `SMILES` spelling.
+- Added fixed-threshold raw multi-dataset and SEA integration-mode results to
+  the technical-validation documentation.
+
 ## v1.0.0 manuscript release candidate - 2026-04-27
 
 - Initial public release candidate for the OdorNet aligned molecule-level dataset.

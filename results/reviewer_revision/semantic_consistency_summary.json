@@ -1,0 +1,12 @@
+{
+  "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+  "model_revision": "c9745ed1d9f207416be6d2e6f8de32d1f16199bf",
+  "model_loaded_from_local_snapshot": true,
+  "max_seq_length": 256,
+  "descriptor_count_with_definition": 490,
+  "descriptor_count_without_definition": 1,
+  "within_primary_mean_similarity_macro": 0.41035169633952057,
+  "within_primary_mean_similarity_weighted": 0.40391110086649096,
+  "cross_primary_mean_similarity_macro": 0.386935759776042,
+  "cross_primary_mean_similarity_weighted": 0.3763369230434657
+}

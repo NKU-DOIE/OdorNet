@@ -1,0 +1,10 @@
+source_id,source_record_count,valid_record_count,removed_record_count,unique_cleaned_smiles,duplicate_records_removed_within_source
+arctander_1960,2824,2824,0,2751,73
+aromadb,869,869,0,869,0
+flavordb,525,525,0,525,0
+flavornet,716,716,0,716,0
+goodscents,4622,4622,0,4561,61
+ifra_2019,1060,1060,0,1060,0
+leffingwell,3522,3522,0,3522,0
+sharma_2021a,4006,4006,0,4006,0
+sharma_2021b,5103,5103,0,5098,5

@@ -1,0 +1,38 @@
+{
+  "split_ratios": {
+    "train": 0.7,
+    "val": 0.2,
+    "test": 0.1
+  },
+  "rows": {
+    "train": 6224,
+    "val": 1778,
+    "test": 890
+  },
+  "label_columns": [
+    "animalic&ambery",
+    "sweety&gourmand",
+    "floral",
+    "fruity&vegetable",
+    "pungent&disagreeable",
+    "green&herbal",
+    "nutty",
+    "woody&mossy",
+    "resinous&balsamic",
+    "cooked",
+    "odorless",
+    "spice"
+  ],
+  "nan_cells": {
+    "train": 15805,
+    "val": 0,
+    "test": 0
+  },
+  "sha256": {
+    "dataset_train_aligned.csv": "8c511453ab79e2a2fd4345db7a07144e47189819a90d7606d12762f5d7e3eeba",
+    "dataset_val_aligned.csv": "16725b980726b0121508f9eb88ee088c30bed93157a36bec899fef4b50fd6fa5",
+    "dataset_test_aligned.csv": "3ac723dc6cb92c88904cd395918d0da843b44c370a6c0852d85fcc9b8918f34a"
+  },
+  "strategy": "connectivity_aware_greedy_complete_row_balancing",
+  "seed": 0
+}
