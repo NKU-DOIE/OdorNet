@@ -1,4 +1,4 @@
-"""Build a reviewable Zenodo candidate package with enriched source provenance.
+"""Build a reviewable Zenodo candidate package with compact source provenance.
 
 The script never edits the current Zenodo record. It creates a new local
 package below `outputs/zenodo/` for review before a maintainer uploads a new
@@ -22,6 +22,20 @@ DEFAULT_VERSION = "1.1.0"
 RESOURCE_DIR = ROOT / "data" / "resources"
 RAW_SOURCE_PATH = ROOT / "data" / "raw" / "merged_8892_cleaned_251230.pkl"
 
+# The supplied raw snapshot uses these source labels. They are converted to
+# the release Source ID values before any Zenodo file is written.
+RAW_SOURCE_TO_SOURCE_ID = {
+    "arctander_1960": "arctander",
+    "aromadb": "aromadb",
+    "flavordb": "flavordb",
+    "flavornet": "flavornet",
+    "goodscents": "TGSC",
+    "ifra_2019": "IFRA",
+    "leffingwell": "Leffingwell",
+    "sharma_2021a": "SMILES_to_smell",
+    "sharma_2021b": "OlfactionBase",
+}
+
 
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
@@ -36,53 +50,42 @@ def _source_registry() -> pd.DataFrame:
     registry = pd.read_csv(path, keep_default_na=False)
     if registry["source_id"].duplicated().any():
         raise ValueError("source_registry.csv contains duplicate source_id values.")
-    if registry["legacy_source_id"].duplicated().any():
-        raise ValueError("source_registry.csv contains duplicate legacy_source_id values.")
+    required = {
+        "source_id",
+        "source_name",
+        "proposed_time",
+        "raw_record_count",
+        "unique_molecule_count",
+        "descriptor_coverage",
+        "doi",
+        "source_url",
+    }
+    missing = required.difference(registry.columns)
+    if missing:
+        raise ValueError(f"source_registry.csv is missing columns: {sorted(missing)}")
     return registry
 
 
 def enrich_source_dataframe(source_df: pd.DataFrame, registry: pd.DataFrame) -> pd.DataFrame:
-    """Map legacy source labels to release IDs and add provenance metadata."""
-    registry_lookup = registry.set_index("legacy_source_id").to_dict(orient="index")
+    """Map supplied source labels to Source ID values and retain SEA inputs."""
+    registry_lookup = registry.set_index("source_id").to_dict(orient="index")
     result = source_df.copy(deep=True)
     enriched_rows = []
-    source_counters: dict[str, int] = {}
     for source_list in result["Source"]:
         enriched_sources = []
         for source_record in source_list:
             record = dict(source_record)
-            legacy_source_id = record.get("Source", "")
-            if legacy_source_id not in registry_lookup:
+            supplied_source_id = record.get("Source", "")
+            source_id = RAW_SOURCE_TO_SOURCE_ID.get(supplied_source_id, supplied_source_id)
+            if source_id not in registry_lookup:
                 raise KeyError(
-                    f"Source registry has no entry for legacy source {legacy_source_id!r}."
+                    f"Source registry has no entry for source {supplied_source_id!r}."
                 )
-            source_meta = registry_lookup[legacy_source_id]
-            source_id = source_meta["source_id"]
-            source_counters[source_id] = source_counters.get(source_id, 0) + 1
-            record["Source"] = source_id
+            source_meta = registry_lookup[source_id]
+            record.pop("Source", None)
             record["source_id"] = source_id
-            record["legacy_source_id"] = legacy_source_id
-            record["source_record_id"] = f"{source_id}-{source_counters[source_id]:07d}"
-            record["original_identifier"] = record.get("Original_SMILES", "")
-            record["original_identifier_type"] = "Original_SMILES"
-            record["raw_label"] = record.get("Original_Labels", "")
-            record["processed_label"] = record.get("Processed_Labels", [])
-            for column in (
-                "source_display_name",
-                "source_type",
-                "source_reference",
-                "source_doi",
-                "source_doi_status",
-                "source_url",
-                "time_range",
-                "raw_record_count",
-                "unique_molecule_count",
-                "descriptor_coverage",
-                "annotation_procedure",
-                "source_relationships",
-                "provenance_notes",
-            ):
-                record[column] = source_meta[column]
+            record["doi"] = source_meta["doi"]
+            record["source_url"] = source_meta["source_url"]
             enriched_sources.append(record)
         enriched_rows.append(enriched_sources)
     result["Source"] = enriched_rows
@@ -93,8 +96,40 @@ def flatten_source_records(source_df: pd.DataFrame) -> pd.DataFrame:
     rows = []
     for source_row in source_df.itertuples():
         for source_record in source_row.Source:
-            rows.append({"SMILES": source_row.SMILES, **source_record})
+            rows.append(
+                {
+                    "SMILES": source_row.SMILES,
+                    "source_id": source_record.get("source_id", ""),
+                    "Original_SMILES": source_record.get("Original_SMILES", ""),
+                    "Original_IUPACname": source_record.get("Original_IUPACname", ""),
+                    "Original_Labels": source_record.get("Original_Labels", ""),
+                    "doi": source_record.get("doi", ""),
+                    "source_url": source_record.get("source_url", ""),
+                }
+            )
     return pd.DataFrame(rows)
+
+
+def compact_source_lists(source_df: pd.DataFrame) -> pd.DataFrame:
+    """Keep only source identity and original evidence in nested release records."""
+    result = source_df.copy(deep=True)
+    compact_rows = []
+    for source_list in result["Source"]:
+        compact_rows.append(
+            [
+                {
+                    "source_id": source_record.get("source_id", ""),
+                    "Original_SMILES": source_record.get("Original_SMILES", ""),
+                    "Original_IUPACname": source_record.get("Original_IUPACname", ""),
+                    "Original_Labels": source_record.get("Original_Labels", ""),
+                    "doi": source_record.get("doi", ""),
+                    "source_url": source_record.get("source_url", ""),
+                }
+                for source_record in source_list
+            ]
+        )
+    result["Source"] = compact_rows
+    return result
 
 
 def write_policy_tables(full: pd.DataFrame, processed_dir: Path) -> None:
@@ -160,23 +195,11 @@ modify the already published Zenodo record.
 ## Provenance Clarifications
 
 `data/provenance/source_records.csv` and
-`data/provenance/source_records.jsonl` preserve the original source fields and
-add:
-
-- `source_id`: canonical source label used in the manuscript;
-- `legacy_source_id`: label used in the pre-release working table;
-- `source_record_id`: deterministic release identifier for a source-level row;
-- `original_identifier`: source-provided SMILES, because source-native record
-  identifiers are unavailable in the supplied consolidated snapshot;
-- `raw_label`: exact source-provided label text, copied from `Original_Labels`;
-- `processed_label`: normalized descriptor list used by SEA;
-- bibliography, persistent-ID, time-range, coverage, annotation, and source
-  relationship fields from the source registry.
-
-`source_doi_status` distinguishes a verified DOI (`available`), a source that
-does not have an assigned DOI (`not_assigned`), and records needing maintainer
-confirmation (`to_be_confirmed`). The accompanying
-`data/provenance/source_registry.csv` is the authoritative source registry.
+`data/provenance/source_records.jsonl` are compact row-wise provenance tables.
+Each row contains the standardized `SMILES`, the `source_id`, the original
+source SMILES and name when supplied, the original source labels, and the
+source DOI and web link. Source-level dates and coverage statistics are kept in
+`docs/source_catalog.md` and `data/provenance/source_registry.csv`.
 
 ## Aggregation Modes
 
@@ -197,12 +220,12 @@ are not different raw-data tables.
 
 - `data/processed/`: base/policy-specific full tables and released
   train/validation/test tables with the split manifest.
-- `data/provenance/`: enriched row-wise source records and source registry.
+- `data/provenance/`: compact row-wise source records and source catalog.
 - `data/metadata/`: SEA mappings and English descriptor definitions.
 - `data/raw/`: enriched source-level molecule table used to reproduce labels.
 - `data_dictionary.md`: GitHub-side field definitions and usage notes.
-- `docs/source_catalog.md`: source-level bibliography, counts, time ranges,
-  relationships, and provenance notes.
+- `docs/source_catalog.md`: source-level names, proposed times, counts,
+  descriptor coverage, DOI values, and web links.
 - `RELEASE_NOTES.md`: release-specific changes and compatibility notes.
 - `checksums_sha256.txt`: SHA-256 checksums for every package file.
 """
@@ -218,7 +241,8 @@ def build_package(version: str, output_root: Path) -> tuple[Path, Path]:
     registry = _source_registry()
     source_df = pd.read_pickle(RAW_SOURCE_PATH)
     enriched_source_df = enrich_source_dataframe(source_df, registry)
-    provenance_df = flatten_source_records(enriched_source_df)
+    public_source_df = compact_source_lists(enriched_source_df)
+    provenance_df = flatten_source_records(public_source_df)
 
     processed_dir = package_dir / "data" / "processed"
     provenance_dir = package_dir / "data" / "provenance"
@@ -228,7 +252,7 @@ def build_package(version: str, output_root: Path) -> tuple[Path, Path]:
         directory.mkdir(parents=True, exist_ok=True)
 
     full = pd.read_csv(ROOT / "data" / "processed" / "full_dataset.csv")
-    source_lookup = enriched_source_df.set_index("SMILES")["Source"].map(
+    source_lookup = public_source_df.set_index("SMILES")["Source"].map(
         lambda value: json.dumps(value, ensure_ascii=False, sort_keys=True)
     )
     if source_lookup.isna().any():
@@ -267,8 +291,8 @@ def build_package(version: str, output_root: Path) -> tuple[Path, Path]:
         "- Enforced connectivity-group separation and verified no missing labels "
         "in validation or test.\n"
         "- Added explicit Drop, Union, and Intersection full-dataset targets.\n"
-        "- Added canonical source IDs, DOI/URL/time-range metadata, deterministic "
-        "source-record IDs, and a source catalog.\n"
+        "- Simplified source provenance to Source ID, original molecule and label "
+        "fields, DOI, and web links; source statistics remain in the catalog.\n"
         "- Corrected the primary label spelling to `pungent&disagreeable`.\n",
         encoding="utf-8",
     )

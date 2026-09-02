@@ -55,12 +55,10 @@ only for an analysis that states that modeling assumption. See
 
 - `fragrantica_notes_2026-08-22.csv`: 1,702 Fragrantica displayed term-category records from a dated PDF capture.
 - `fragrantica_notes_2026-08-22_unique_terms.csv`: the 1,698 globally deduplicated terms from the same capture.
-- `source_registry.csv`: canonical source identifiers, legacy aliases,
-  references, DOI status, URLs, time ranges, record counts, descriptor
-  coverage, annotation procedures, and source-relationship notes used by the
-  Zenodo provenance release.
+- `source_registry.csv`: Source IDs, proposed source times, record counts,
+  descriptor coverage, DOI values, and source URLs used by the Zenodo release.
 
-The complete nine-source catalog, including time ranges and Table 1 counts, is
+The complete nine-source catalog, including proposed times and Table 1 counts, is
 available at `docs/source_catalog.md`.
 
 The Fragrantica files are a transparent expert-review reference vocabulary only; they are not OdorNet targets and do not replace the released SEA mapping. See `data/resources/README.md` for collection scope and attribution notes.

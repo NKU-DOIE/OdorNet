@@ -24,12 +24,9 @@ used.
 
 ## Source Registry
 
-`source_registry.csv` is the canonical source-level registry used to build the
-Zenodo package. It records the stable manuscript-facing `source_id`, the
-supplied `legacy_source_id`, source type, bibliographic reference, DOI or
-source URL, time range, raw-record count, unique molecule count, descriptor
-coverage, annotation procedure, and documented source relationships. Blank
-DOI values are deliberate: a source may be a website or book without an
-assigned DOI. The release builder joins nested source records to this registry
-through `legacy_source_id`, then writes the canonical `source_id` to every
-Zenodo provenance row.
+`source_registry.csv` is the machine-readable source catalog used to build the
+Zenodo package. It records the `source_id`, source name, proposed source time,
+raw-record count, unique molecule count, descriptor coverage, DOI when
+available, and source URL. Blank DOI values are deliberate: a source may be a
+website or book without an assigned DOI. The release builder uses these Source
+ID values in every Zenodo provenance row.

@@ -89,8 +89,8 @@ notebook.
 term-category records and 1,698 globally deduplicated terms. It is a
 transparent expert-review vocabulary, not an OdorNet target mapping.
 
-The nine-source canonical registry and provenance fields are documented in
+The nine-source catalog and provenance fields are documented in
 `docs/source_catalog.md` and `data_dictionary.md`. Zenodo preserves each raw
-source label alongside its normalized SEA descriptor list, canonical source
-ID, legacy ID, DOI/URL, time range, annotation procedure, and source
-relationship metadata.
+source label alongside its original molecule information, Source ID, DOI, and
+source URL. Source dates, counts, and descriptor coverage are reported once in
+the catalog.

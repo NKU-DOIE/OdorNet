@@ -1,8 +1,8 @@
 # OdorNet Data Dictionary
 
-This document defines the processed GitHub tables and the provenance-rich
-tables included in the OdorNet Zenodo 1.1.0 package. Canonical source IDs,
-references, persistent identifiers, time ranges, and source relationships are
+This document defines the processed GitHub tables and the provenance tables
+included in the OdorNet Zenodo 1.1.0 package. Source IDs, proposed source
+times, counts, descriptor coverage, persistent identifiers, and web links are
 listed in `docs/source_catalog.md` and `data/resources/source_registry.csv`.
 
 ## Processed GitHub Tables
@@ -82,7 +82,7 @@ the supplied source-level records. The principal files are:
 | --- | --- | --- |
 | `data/provenance/source_records.csv` | one source annotation per row | Flat, spreadsheet-friendly provenance table. |
 | `data/provenance/source_records.jsonl` | one source annotation per line | Equivalent provenance records for streaming tools. |
-| `data/provenance/source_registry.csv` | one of nine sources per row | Canonical identifiers and source-level metadata. |
+| `data/provenance/source_registry.csv` | one of nine sources per row | Source IDs and source-catalog metadata. |
 | `data/raw/merged_8892_cleaned_251230.pkl` | one consolidated molecule per row | Source-list-preserving table used by SEA preparation. |
 
 The Zenodo `data/processed/full_dataset*.csv` files add a `Source` column not
@@ -95,46 +95,33 @@ text field. The Zenodo policy tables additionally carry `integration_policy`.
 | Field | Meaning |
 | --- | --- |
 | `SMILES` | Consolidated standardized molecule SMILES. |
-| `Source` / `source_id` | Canonical source ID used in the manuscript and release. |
-| `legacy_source_id` | Pre-release source label found in the supplied working table. |
-| `source_record_id` | Deterministic ID assigned to the source record during package construction. |
-| `original_identifier` | Source-provided structure identifier. In this snapshot it is the original SMILES. |
-| `original_identifier_type` | Identifier type, fixed to `Original_SMILES` because source-native row IDs were not supplied. |
+| `source_id` | Source ID used in the release. |
 | `Original_SMILES` | Structure string retained from the source record. |
 | `Original_IUPACname` | Source-provided IUPAC name when available. |
-| `Original_Labels` / `raw_label` | Unchanged source label text. |
-| `Pre_Processed_Labels` | Parsed source descriptors before the final normalization stage. |
-| `Processed_Labels` / `processed_label` | Normalized descriptor list supplied to SEA. |
-| `source_display_name`, `source_type`, `source_reference` | Human-readable identity and citation. |
-| `source_doi`, `source_doi_status`, `source_url` | Persistent identifier status and source website. |
-| `time_range` | Publication date or website/snapshot period represented by this release. |
-| `raw_record_count`, `unique_molecule_count`, `descriptor_coverage` | Source summary counts used in the catalog. |
-| `annotation_procedure` | How the labels were captured in the supplied source snapshot. |
-| `source_relationships`, `provenance_notes` | Known reuse, aggregation, or source-specific caveats. |
+| `Original_Labels` | Unchanged source label text. |
+| `doi` | DOI associated with the source, when available; otherwise blank. |
+| `source_url` | Web page or repository associated with the source. |
 
 ### `source_registry.csv` fields
 
-`source_registry.csv` contains the source-level metadata fields above, except
-molecule-specific annotation fields. It has exactly nine rows, one for each
-canonical source. The canonical mapping is intentionally stable:
+`source_registry.csv` is the machine-readable source catalog. It has exactly
+nine rows, one for each source, and contains:
 
-| Canonical source ID | Legacy source ID |
+| Field | Meaning |
 | --- | --- |
-| `arctander` | `arctander_1960` |
-| `aromadb` | `aromadb` |
-| `flavordb` | `flavordb` |
-| `flavornet` | `flavornet` |
-| `TGSC` | `goodscents` |
-| `IFRA` | `ifra_2019` |
-| `Leffingwell` | `leffingwell` |
-| `SMILES_to_smell` | `sharma_2021a` |
-| `OlfactionBase` | `sharma_2021b` |
+| `source_id` | Source ID used throughout the release. |
+| `source_name` | Human-readable source name. |
+| `proposed_time` | Publication or initial source date; no snapshot range. |
+| `raw_record_count` | Number of source-level records in the release snapshot. |
+| `unique_molecule_count` | Number of unique molecules contributed by the source. |
+| `descriptor_coverage` | Number of distinct source descriptors represented by the source. |
+| `doi` | DOI associated with the source, when available. |
+| `source_url` | Web page or repository associated with the source. |
 
 `OlfactionBase` is associated with the `SMILES_to_smell` publication and the
 relevant records include its odorless/PubChem compilation. Beryllium-related
-records in the source snapshot are documented as originating from that
-compilation; the provenance record does not make an independent toxicity
-claim.
+records in the source snapshot originate from that compilation; this is a
+provenance statement and not an independent toxicity claim.
 
 ## Positive and Missing Counts
 
